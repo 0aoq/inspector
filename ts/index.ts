@@ -67,7 +67,7 @@ class Inspector {
     window: HTMLDivElement;
 
     selected?: HTMLElement; // track selected element
-    tab: "display" | "console"; // track current tab
+    tab: "display" | "console" | "storage"; // track current tab
 
     constructor() {
         this.active = false;
@@ -88,6 +88,7 @@ class Inspector {
         #${this.id}.inspect\\.window * {
             outline: none !important;
             cursor: initial !important;
+            color: black !important;
 
             margin: 0;
             padding: 0;
@@ -116,6 +117,13 @@ class Inspector {
             top: -50px; /* position off-page at start */
             left: -50px; /* position off-page at start */
             z-index: 9999;
+        }
+
+        #${this.id}.inspect\\.window input, 
+        #${this.id}.inspect\\.window textarea {
+            width: initial !important;
+            background: white !important;
+            border: solid 1px darkgray !important;
         }
 
         #${this.id}.inspect\\.window.off {
@@ -213,6 +221,7 @@ class Inspector {
                     );
                 } else if (dataName === "display") this.tab = "display";
                 else if (dataName === "console") this.tab = "console";
+                else if (dataName === "storage") this.tab = "storage";
 
                 // inspect again
                 this.inspectElement(this.selected, {
@@ -293,7 +302,18 @@ class Inspector {
 
             <button onclick="window['${
                 this.id
+            }'].sp(event, 'storage')">Storage</button>
+
+            <button onclick="window['${
+                this.id
             }'].sp(event, 'reload')">Refresh</button>
+        </div>
+
+        <!-- extra menu -->
+        <div class="inspect.element">Side Mode: <input type="checkbox" rows="5" cols="35" 
+            onchange="window['${this.id}'].sp(event, 'sideMode')" ${
+                this.window.hasAttribute("side-mode") === true ? "checked" : ""
+            }>
         </div>
         
         <!-- tab -->
@@ -323,9 +343,14 @@ class Inspector {
                     onchange="window['${this.id}'].ch(event, '')" disabled>
                         ${style}
                     </textarea>
-                </div>
-                
-                <div class="inspect.element">localStorage: <textarea rows="5" cols="35" 
+                </div>`
+                : this.tab === "console"
+                ? `
+                <!-- console tab -->
+                ${_logs}
+                `
+                : this.tab === "storage"
+                ? `<div class="inspect.element">localStorage: <textarea rows="5" cols="35" 
                     onchange="window['${this.id}'].ch(event, '')" disabled>
                         ${JSON.stringify({ ...localStorage })}
                     </textarea>
@@ -335,20 +360,7 @@ class Inspector {
                     onchange="window['${this.id}'].ch(event, '')" disabled>
                         ${JSON.stringify({ ...sessionStorage })}
                     </textarea>
-                </div>
-                
-                <div class="inspect.element">Side Mode: <input type="checkbox" rows="5" cols="35" 
-                    onchange="window['${this.id}'].sp(event, 'sideMode')" ${
-                      this.window.hasAttribute("side-mode") === true
-                          ? "checked"
-                          : ""
-                  }>
                 </div>`
-                : this.tab === "console"
-                ? `
-                <!-- console tab -->
-                ${_logs}
-                `
                 : undefined
         }`;
 
