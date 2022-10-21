@@ -152,16 +152,50 @@ class Inspector {
             background: whitesmoke;
         }
 
+        #${this.id}.inspect\\.window .inspect\\.element\\.tab {
+            /* --size: 4rem; */
+
+            background: white;
+
+            /* width: var(--size);
+            height: var(--size); */
+            padding: 0.2rem 0.4rem;
+            
+            transition: all 0.05s;
+            border: solid 1px transparent;
+            border-radius: 1rem;
+            outline: none;
+
+            cursor: pointer !important;
+        }
+
+        #${this.id}.inspect\\.window .inspect\\.element\\.tab:hover {
+            background: whitesmoke;
+            border: solid 1px darkgray;
+        }
+
+        #${this.id}.inspect\\.window .inspect\\.element\\.tab.active {
+            border: solid 1px hsl(226, 61%, 54%);
+            background: hsla(226, 61%, 54%, 0.25);
+        }
+
+        #${this.id}.inspect\\.window .inspect\\.element\\.tab.active:hover {
+            background: hsl(226, 61%, 49%);
+            color: white !important;
+            box-shadow: 0 0 8px hsl(226, 61%, 54%);
+        }
+
         /* side mode */
+
         #${this.id}.inspect\\.window[side-mode] {
             top: 0% !important;
-            left: calc(100% - 20rem) !important;
-            height: 100vh;
+            left: calc(100% - 21rem) !important;
+            height: 98.5vh;
             overflow: auto !important;
         }
 
         html[inspector-side-mode] body {
-            padding-right: 20rem;
+            padding-right: 22rem;
         }`;
 
         // create inspector window
@@ -271,6 +305,10 @@ class Inspector {
 
         // toggle window visibility
         this.window.classList.toggle("off");
+
+        // toggle side mode
+        document.documentElement.toggleAttribute("inspector-side-mode");
+        this.window.toggleAttribute("side-mode");
     }
 
     /**
@@ -307,29 +345,35 @@ class Inspector {
             _logs += `<div class="inspect.element">{${log.ts}} ${log.data}</div>`;
 
         // add basic element information
-        this.window.innerHTML = `<h2>${element.nodeName} #${element.id} .${
-            element.className
-        }</h2>
+        this.window.innerHTML = `
+        <!-- primary window -->
+        <h2>${element.nodeName} #${element.id} .${element.className}</h2>
 
         <p>Press ESCAPE to disable.</p><br>
 
         <!-- tabs -->
-        <div class="inspect.element">
+        <div class="inspect.element" style="display: flex; flex-wrap: wrap; justify-content: center;">
             <button onclick="window['${
                 this.id
-            }'].sp(event, 'display')">Display</button>
+            }'].sp(event, 'display')" class="inspect.element.tab ${
+            this.tab === "display" ? "active" : ""
+        }"}>Display</button>
 
             <button onclick="window['${
                 this.id
-            }'].sp(event, 'console')">Console</button>
+            }'].sp(event, 'console')" class="inspect.element.tab ${
+            this.tab === "console" ? "active" : ""
+        }">Console</button>
 
             <button onclick="window['${
                 this.id
-            }'].sp(event, 'storage')">Storage</button>
+            }'].sp(event, 'storage')" class="inspect.element.tab ${
+            this.tab === "storage" ? "active" : ""
+        }">Storage</button>
 
             <button onclick="window['${
                 this.id
-            }'].sp(event, 'reload')">Refresh</button>
+            }'].sp(event, 'reload')" class="inspect.element.tab">Refresh</button>
         </div>
 
         <!-- extra menu -->
@@ -373,11 +417,13 @@ class Inspector {
                 ${_logs}
 
                 <div class="inspect.element">Run JavaScript: <textarea rows="5" cols="35" 
-                    onchange="window['${this.id}'].sp(event, 'runjs')"></textarea>
+                    onchange="window['${this.id}'].sp(event, 'runjs')">(() => {\n\n})();</textarea>
                 </div>
                 `
                 : this.tab === "storage"
-                ? `<div class="inspect.element">localStorage: <textarea rows="5" cols="35" 
+                ? `
+                <!-- storage tab -->
+                <div class="inspect.element">localStorage: <textarea rows="5" cols="35" 
                     onchange="window['${this.id}'].ch(event, '')" disabled>
                         ${JSON.stringify({ ...localStorage })}
                     </textarea>
