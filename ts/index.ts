@@ -4,6 +4,58 @@
  * @license MIT
  */
 
+let logs = {
+    general: [] as any[],
+
+    // bind functions
+    f: {
+        log: console.log.bind(console),
+        error: console.error.bind(console),
+        warn: console.warn.bind(console),
+    },
+};
+
+console.log = (data: any) => {
+    logs.f.log.apply(console, [data]);
+    logs.general.push({
+        ts: performance.now(),
+        data,
+    });
+};
+
+console.error = (data: any) => {
+    logs.f.error.apply(console, [data]);
+    logs.general.push({
+        ts: performance.now(),
+        data,
+    });
+};
+
+console.warn = (data: any) => {
+    logs.f.warn.apply(console, [data]);
+    logs.general.push({
+        ts: performance.now(),
+        data,
+    });
+};
+
+window.addEventListener(
+    "unhandledrejection",
+    (event: PromiseRejectionEvent) => {
+        logs.general.push({
+            ts: performance.now(),
+            data: event.reason,
+        });
+    }
+);
+
+window.addEventListener("error", (event: ErrorEvent) => {
+    logs.general.push({
+        ts: performance.now(),
+        data: event.error,
+    });
+});
+
 /**
  * @class Inspector
  */
@@ -14,12 +66,14 @@ class Inspector {
     styleSheetElement: HTMLStyleElement;
     window: HTMLDivElement;
 
-    selected?: HTMLElement;
+    selected?: HTMLElement; // track selected element
+    tab: "display" | "console"; // track current tab
 
     constructor() {
         this.active = false;
         this.styleSheetElement = document.createElement("style");
         this.id = `inspector-${window.crypto.randomUUID()}`;
+        this.tab = "display"; // set default tab
 
         // append stylesheet element
         document.head.appendChild(this.styleSheetElement);
@@ -54,6 +108,7 @@ class Inspector {
             position: fixed;
             font-family: monospace !important;
             max-width: 20rem;
+            width: 20rem;
             overflow: hidden;
             text-overflow: ellipsis;
             transition: all 0.2s;
@@ -153,8 +208,17 @@ class Inspector {
                 if (dataName === "sideMode") {
                     // toggle sideMode attribute
                     this.window.toggleAttribute("side-mode");
-                    document.documentElement.toggleAttribute("inspector-side-mode");
-                }
+                    document.documentElement.toggleAttribute(
+                        "inspector-side-mode"
+                    );
+                } else if (dataName === "display") this.tab = "display";
+                else if (dataName === "console") this.tab = "console";
+
+                // inspect again
+                this.inspectElement(this.selected, {
+                    x: (event as any).pageX,
+                    y: (event as any).pageY,
+                });
             },
         };
     }
@@ -205,52 +269,88 @@ class Inspector {
             )};\n`;
         }
 
+        // get console logs
+        let _logs = "";
+        for (let log of logs.general)
+            _logs += `<div class="inspect.element">{${log.ts}} ${log.data}</div>`;
+
         // add basic element information
         this.window.innerHTML = `<h2>${element.nodeName} #${element.id} .${
             element.className
         }</h2>
-        <p>Press ESCAPE to disable.</p><br>
-        <div class="inspect.element">nodeName: ${element.nodeName}</div>
-        
-        <div class="inspect.element">ID: <input 
-            onchange="window['${this.id}'].ch(event, 'id')" 
-            value="${element.id}">
-        </div>
-        
-        <div class="inspect.element">className: <input 
-            onchange="window['${this.id}'].ch(event, 'className')" 
-            value="${element.className}">
-        </div>
 
-        <div class="inspect.element">outerHTML: <textarea rows="5" cols="35" 
-            onchange="window['${this.id}'].ch(event, 'outerHTML')">
-                ${new Option(element.outerHTML).innerHTML}
-            </textarea>
+        <p>Press ESCAPE to disable.</p><br>
+
+        <!-- tabs -->
+        <div class="inspect.element">
+            <button onclick="window['${
+                this.id
+            }'].sp(event, 'display')">Display</button>
+
+            <button onclick="window['${
+                this.id
+            }'].sp(event, 'console')">Console</button>
+
+            <button onclick="window['${
+                this.id
+            }'].sp(event, 'reload')">Refresh</button>
         </div>
         
-        <div class="inspect.element">computed: <textarea rows="5" cols="35" 
-            onchange="window['${this.id}'].ch(event, '')" disabled>
-                ${style}
-            </textarea>
-        </div>
+        <!-- tab -->
+        ${
+            this.tab === "display"
+                ? `
+                <!-- display tab -->
+                <div class="inspect.element">nodeName: ${element.nodeName}</div>
         
-        <div class="inspect.element">localStorage: <textarea rows="5" cols="35" 
-            onchange="window['${this.id}'].ch(event, '')" disabled>
-                ${JSON.stringify({ ...localStorage })}
-            </textarea>
-        </div>
-        
-        <div class="inspect.element">sessionStorage: <textarea rows="5" cols="35" 
-            onchange="window['${this.id}'].ch(event, '')" disabled>
-                ${JSON.stringify({ ...sessionStorage })}
-            </textarea>
-        </div>
-        
-        <div class="inspect.element">Side Mode: <input type="checkbox" rows="5" cols="35" 
-            onchange="window['${this.id}'].sp(event, 'sideMode')" ${
-            this.window.hasAttribute("side-mode") === true ? "checked" : ""
-        }>
-        </div>`;
+                <div class="inspect.element">ID: <input 
+                    onchange="window['${this.id}'].ch(event, 'id')" 
+                    value="${element.id}">
+                </div>
+                
+                <div class="inspect.element">className: <input 
+                    onchange="window['${this.id}'].ch(event, 'className')" 
+                    value="${element.className}">
+                </div>
+
+                <div class="inspect.element">outerHTML: <textarea rows="5" cols="35" 
+                    onchange="window['${this.id}'].ch(event, 'outerHTML')">
+                        ${new Option(element.outerHTML).innerHTML}
+                    </textarea>
+                </div>
+                
+                <div class="inspect.element">computed: <textarea rows="5" cols="35" 
+                    onchange="window['${this.id}'].ch(event, '')" disabled>
+                        ${style}
+                    </textarea>
+                </div>
+                
+                <div class="inspect.element">localStorage: <textarea rows="5" cols="35" 
+                    onchange="window['${this.id}'].ch(event, '')" disabled>
+                        ${JSON.stringify({ ...localStorage })}
+                    </textarea>
+                </div>
+                
+                <div class="inspect.element">sessionStorage: <textarea rows="5" cols="35" 
+                    onchange="window['${this.id}'].ch(event, '')" disabled>
+                        ${JSON.stringify({ ...sessionStorage })}
+                    </textarea>
+                </div>
+                
+                <div class="inspect.element">Side Mode: <input type="checkbox" rows="5" cols="35" 
+                    onchange="window['${this.id}'].sp(event, 'sideMode')" ${
+                      this.window.hasAttribute("side-mode") === true
+                          ? "checked"
+                          : ""
+                  }>
+                </div>`
+                : this.tab === "console"
+                ? `
+                <!-- console tab -->
+                ${_logs}
+                `
+                : undefined
+        }`;
 
         this.selected = element;
     }
