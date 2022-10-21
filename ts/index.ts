@@ -16,6 +16,7 @@ let logs = {
 };
 
 console.log = (data: any) => {
+    if (data === undefined) return;
     logs.f.log.apply(console, [data]);
     logs.general.push({
         ts: performance.now(),
@@ -24,6 +25,7 @@ console.log = (data: any) => {
 };
 
 console.error = (data: any) => {
+    if (data === undefined) return;
     logs.f.error.apply(console, [data]);
     logs.general.push({
         ts: performance.now(),
@@ -32,6 +34,7 @@ console.error = (data: any) => {
 };
 
 console.warn = (data: any) => {
+    if (data === undefined) return;
     logs.f.warn.apply(console, [data]);
     logs.general.push({
         ts: performance.now(),
@@ -96,6 +99,8 @@ class Inspector {
             flex-wrap: wrap;
             white-space: initial;
             overflow-wrap: break-word;
+
+            font-family: monospace !important;
         }
         
         #${this.id}.inspect\\.window {
@@ -107,7 +112,6 @@ class Inspector {
             flex-direction: column;
             gap: 0.2rem; */
             position: fixed;
-            font-family: monospace !important;
             max-width: 20rem;
             width: 20rem;
             overflow: hidden;
@@ -124,6 +128,11 @@ class Inspector {
             width: initial !important;
             background: white !important;
             border: solid 1px darkgray !important;
+        }
+
+        #${this.id}.inspect\\.window input:disabled, 
+        #${this.id}.inspect\\.window textarea:disabled {
+            color: gray !important;
         }
 
         #${this.id}.inspect\\.window.off {
@@ -157,7 +166,7 @@ class Inspector {
 
         // create inspector window
         this.window = document.createElement("div");
-        this.window.innerHTML = `<div class="inspect.window off" id="${this.id}"></div>`;
+        this.window.innerHTML = `<div class="inspect.window inspect.core off" id="${this.id}"></div>`;
 
         // append inspector window
         document.body.appendChild(this.window);
@@ -165,7 +174,11 @@ class Inspector {
 
         // bind document contextmenu to a function
         document.addEventListener("contextmenu", (event: Event) => {
-            if (!this.active) return;
+            if (
+                !this.active ||
+                (event.target as HTMLElement).classList.contains("inspect.core")
+            )
+                return;
             event.preventDefault();
             this.inspectElement(event.target as HTMLElement, {
                 x: (event as any).pageX,
@@ -222,6 +235,12 @@ class Inspector {
                 } else if (dataName === "display") this.tab = "display";
                 else if (dataName === "console") this.tab = "console";
                 else if (dataName === "storage") this.tab = "storage";
+                else if (dataName === "runjs") {
+                    const value = (event.target as HTMLTextAreaElement).value;
+
+                    console.log(`~> ${value}`);
+                    new Function(`return ${value}`)(); // run code
+                }
 
                 // inspect again
                 this.inspectElement(this.selected, {
@@ -230,6 +249,10 @@ class Inspector {
                 });
             },
         };
+
+        // enable side mode
+        this.window.toggleAttribute("side-mode");
+        document.documentElement.toggleAttribute("inspector-side-mode");
     }
 
     /**
@@ -312,8 +335,8 @@ class Inspector {
         <!-- extra menu -->
         <div class="inspect.element">Side Mode: <input type="checkbox" rows="5" cols="35" 
             onchange="window['${this.id}'].sp(event, 'sideMode')" ${
-                this.window.hasAttribute("side-mode") === true ? "checked" : ""
-            }>
+            this.window.hasAttribute("side-mode") === true ? "checked" : ""
+        }>
         </div>
         
         <!-- tab -->
@@ -348,6 +371,10 @@ class Inspector {
                 ? `
                 <!-- console tab -->
                 ${_logs}
+
+                <div class="inspect.element">Run JavaScript: <textarea rows="5" cols="35" 
+                    onchange="window['${this.id}'].sp(event, 'runjs')"></textarea>
+                </div>
                 `
                 : this.tab === "storage"
                 ? `<div class="inspect.element">localStorage: <textarea rows="5" cols="35" 
@@ -365,6 +392,11 @@ class Inspector {
         }`;
 
         this.selected = element;
+
+        // add .inspect\.core to all elements under the inspector
+        for (let element of document.querySelectorAll(`#${this.id} *`) as any) {
+            element.classList.add("inspect.core");
+        }
     }
 }
 
