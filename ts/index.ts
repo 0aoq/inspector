@@ -101,6 +101,9 @@ class Inspector {
             box-sizing: content-box;
 
             font-family: monospace !important;
+            font-size: initial !important;
+            line-spacing: initial !important;
+            line-height: initial !important;
         }
         
         #${this.id}.inspect\\.window {
@@ -294,7 +297,7 @@ class Inspector {
                     const value = (event.target as HTMLTextAreaElement).value;
 
                     console.log(`~> ${value}`);
-                    new Function(`return ${value}`)(); // run code
+                    new Function(`(() => { ${value} })();`)(); // run code
                 }
 
                 // inspect again
@@ -438,7 +441,7 @@ class Inspector {
                 ${_logs}
 
                 <div class="inspect.element">Run JavaScript: <textarea rows="5" cols="35" 
-                    onchange="window['${this.id}'].sp(event, 'runjs')">(() => {\n\n})();</textarea>
+                    onchange="window['${this.id}'].sp(event, 'runjs')"></textarea>
                 </div>
                 `
                 : this.tab === "storage"
