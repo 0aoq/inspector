@@ -72,14 +72,13 @@ class Inspector {
     selected?: HTMLElement; // track selected element
     tab: "display" | "console" | "storage"; // track current tab
 
+    sr: ShadowRoot;
+
     constructor() {
         this.active = false;
         this.styleSheetElement = document.createElement("style");
         this.id = `inspector-${window.crypto.randomUUID()}`;
         this.tab = "display"; // set default tab
-
-        // append stylesheet element
-        document.head.appendChild(this.styleSheetElement);
 
         // add styles
         this.styleSheetElement.innerHTML = `html[data-mode="inspect"] *:hover {
@@ -99,6 +98,7 @@ class Inspector {
             flex-wrap: wrap;
             white-space: initial;
             overflow-wrap: break-word;
+            box-sizing: content-box;
 
             font-family: monospace !important;
         }
@@ -142,7 +142,7 @@ class Inspector {
         #${this.id}.inspect\\.window .inspect\\.element {
             border-top: solid 1px darkgray;
             /* border-bottom: solid 1px darkgray; */
-            padding: 0.4rem 0;
+            padding: 0.4rem;
             display: flex;
             align-items: center;
             gap: 0.2rem;
@@ -189,9 +189,10 @@ class Inspector {
 
         #${this.id}.inspect\\.window[side-mode] {
             top: 0% !important;
-            left: calc(100% - 21rem) !important;
-            height: 98.5vh;
+            left: calc(100% - 22rem) !important;
+            height: 100vh;
             overflow: auto !important;
+            padding: 1rem;
         }
 
         html[inspector-side-mode] body {
@@ -200,11 +201,31 @@ class Inspector {
 
         // create inspector window
         this.window = document.createElement("div");
-        this.window.innerHTML = `<div class="inspect.window inspect.core off" id="${this.id}"></div>`;
+        this.window.innerHTML = `<div id="${this.id}"></div>`;
 
         // append inspector window
         document.body.appendChild(this.window);
-        this.window = document.getElementById(this.id) as HTMLDivElement;
+
+        // attach shadowroot
+        this.sr = document
+            .getElementById(this.id)!
+            .attachShadow({ mode: "open" });
+
+        this.sr.innerHTML = `<div 
+            id="${this.id}" 
+            class="inspect.window inspect.core off">
+        </div>`; // we're going to put the actual inspector content in here
+
+        // append stylesheet element
+        // must be shared between the shadowroot and the document
+        this.sr.innerHTML += `<style>${this.styleSheetElement.innerHTML}</style>`;
+        document.head.appendChild(this.styleSheetElement);
+
+        // get actual window
+        this.window = this.sr.getElementById(this.id) as HTMLDivElement;
+
+        // and now set it to the sr...
+        this.window = this.sr.getElementById(this.id) as HTMLDivElement;
 
         // bind document contextmenu to a function
         document.addEventListener("contextmenu", (event: Event) => {
@@ -357,7 +378,7 @@ class Inspector {
                 this.id
             }'].sp(event, 'display')" class="inspect.element.tab ${
             this.tab === "display" ? "active" : ""
-        }"}>Display</button>
+        }">Display</button>
 
             <button onclick="window['${
                 this.id
