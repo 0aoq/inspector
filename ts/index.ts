@@ -70,7 +70,7 @@ class Inspector {
     window: HTMLDivElement;
 
     selected?: HTMLElement; // track selected element
-    tab: "display" | "console" | "storage"; // track current tab
+    tab: "display" | "console" | "storage" | "performance"; // track current tab
 
     sr: ShadowRoot;
 
@@ -234,9 +234,13 @@ class Inspector {
         document.addEventListener("contextmenu", (event: Event) => {
             if (
                 !this.active ||
-                (event.target as HTMLElement).classList.contains("inspect.core")
+                (event.target as HTMLElement).classList.contains(
+                    "inspect.core"
+                ) ||
+                (event.target as HTMLElement).id === this.id
             )
                 return;
+
             event.preventDefault();
             this.inspectElement(event.target as HTMLElement, {
                 x: (event as any).pageX,
@@ -284,20 +288,82 @@ class Inspector {
                 if (!this.selected) return;
 
                 // handle different dataName(s)
-                if (dataName === "sideMode") {
-                    // toggle sideMode attribute
-                    this.window.toggleAttribute("side-mode");
-                    document.documentElement.toggleAttribute(
-                        "inspector-side-mode"
-                    );
-                } else if (dataName === "display") this.tab = "display";
-                else if (dataName === "console") this.tab = "console";
-                else if (dataName === "storage") this.tab = "storage";
-                else if (dataName === "runjs") {
-                    const value = (event.target as HTMLTextAreaElement).value;
+                switch (dataName) {
+                    // mode change
+                    case "sideMode":
+                        // toggle sideMode attribute
+                        this.window.toggleAttribute("side-mode");
+                        document.documentElement.toggleAttribute(
+                            "inspector-side-mode"
+                        );
+                        break;
 
-                    console.log(`~> ${value}`);
-                    new Function(`(() => { ${value} })();`)(); // run code
+                    // tab changes
+                    case "display":
+                        this.tab = "display";
+                        break;
+
+                    case "console":
+                        this.tab = "console";
+                        break;
+
+                    case "storage":
+                        this.tab = "storage";
+                        break;
+
+                    case "performance":
+                        this.tab = "performance";
+                        break;
+
+                    // console
+                    case "runjs":
+                        const value = (event.target as HTMLTextAreaElement)
+                            .value;
+
+                        console.log(`~> ${value}`);
+                        new Function(`(() => { ${value} })();`)(); // run code
+                        break;
+
+                    // performance
+                    case "mark":
+                        // create new performance mark
+                        performance.mark("ins-mark");
+                        break;
+
+                    case "stamp":
+                        // create end mark
+                        performance.mark("ins-end-mark");
+
+                        // measure
+                        performance.measure(
+                            "ins-s-to-e-measure",
+                            "ins-mark",
+                            "ins-end-mark"
+                        );
+
+                        // log results
+                        const results =
+                            performance.getEntriesByName("ins-s-to-e-measure");
+
+                        console.log(
+                            `STAMP RESULT: ${JSON.stringify({
+                                start: `${results[0].startTime}ms`,
+                                duration: `${results[0].duration}ms`,
+                            })}`
+                        );
+
+                        // clear
+                        performance.clearMarks();
+                        performance.clearMeasures();
+
+                        // load console tab
+                        this.tab = "console";
+
+                        break;
+
+                    // default
+                    default:
+                        break;
                 }
 
                 // inspect again
@@ -368,6 +434,13 @@ class Inspector {
         for (let log of logs.general)
             _logs += `<div class="inspect.element">{${log.ts}} ${log.data}</div>`;
 
+        // remove all event listeners
+        for (let element of this.window.querySelectorAll("*") as any) {
+            if (element.onsubmit) element.onsubmit = null;
+            if (element.onclick) element.onclick = null;
+            if (element.onchange) element.onchange = null;
+        }
+
         // add basic element information
         this.window.innerHTML = `
         <!-- primary window -->
@@ -394,6 +467,12 @@ class Inspector {
             }'].sp(event, 'storage')" class="inspect.element.tab ${
             this.tab === "storage" ? "active" : ""
         }">Storage</button>
+
+            <button onclick="window['${
+                this.id
+            }'].sp(event, 'performance')" class="inspect.element.tab ${
+            this.tab === "performance" ? "active" : ""
+        }">Performance</button>
 
             <button onclick="window['${
                 this.id
@@ -457,14 +536,41 @@ class Inspector {
                     onchange="window['${this.id}'].ch(event, '')" disabled>
                         ${JSON.stringify({ ...sessionStorage })}
                     </textarea>
+                </div>
+                
+                <div class="inspect.element">cookie: <textarea rows="5" cols="35" 
+                    onchange="window['${this.id}'].ch(event, '')" disabled>
+                        ${document.cookie}
+                    </textarea>
                 </div>`
+                : this.tab === "performance"
+                ? `
+                <!-- performance tab -->
+                <div class="inspect.element">
+                    <b>Timestamp Configuration</b>
+                    ${
+                        performance.getEntriesByName("ins-mark").length !== 0
+                            ? 'Mark already active! Click "Stamp" below to end and measure mark.'
+                            : ""
+                    }
+                </div>
+
+                <div class="inspect.element">
+                    <button onclick="window['${
+                        this.id
+                    }'].sp(event, 'mark')">Mark</button>
+                    <button onclick="window['${
+                        this.id
+                    }'].sp(event, 'stamp')">Stamp</button>
+                </div>
+                `
                 : undefined
         }`;
 
         this.selected = element;
 
         // add .inspect\.core to all elements under the inspector
-        for (let element of document.querySelectorAll(`#${this.id} *`) as any) {
+        for (let element of this.sr.querySelectorAll(`#${this.id} *`) as any) {
             element.classList.add("inspect.core");
         }
     }
